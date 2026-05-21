@@ -1,0 +1,40 @@
+.audio-input {
+  padding: 1rem;
+}
+
+.audio-input .form-group {
+  margin-bottom: 1.5rem;
+}
+
+.audio-input label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.audio-input .file-input {
+  width: 100%;
+}
+
+.audio-preview {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-md);
+}
+
+.audio-player {
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.audio-preview .file-name {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.audio-input .submit-button {
+  width: 100%;
+}
