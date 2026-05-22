@@ -176,12 +176,11 @@ export const generateAllSummaries = async (content, contentType = '') => {
 
     console.log('Generating all summaries in a single JSON API request...');
     
-    // Handle very large documents by truncating to stay safely within the 6,000 TPM limit
-    // 16,000 characters is about 3,500 - 4,000 tokens, leaving enough headroom for the response!
+    // Handle large documents by truncating to stay safely within Groq's 6,000 TPM limit.
     let processedContent = content;
-    if (content.length > 16000) {
+    if (content.length > 9000) {
       console.log(`Content is very large (${content.length} characters). Compressing context to remain safely under Groq's 6,000 TPM limit...`);
-      processedContent = content.slice(0, 13000) + "\n\n[... content truncated for length ...]\n\n" + content.slice(-3000);
+      processedContent = content.slice(0, 7000) + "\n\n[... content truncated for length ...]\n\n" + content.slice(-1500);
     }
 
     const systemPrompt = `You are a professional content summarizer. You must analyze the provided content and return a JSON object containing different types of summaries.
@@ -217,7 +216,7 @@ Do not include any markdown formatting, backticks, or text before/after the JSON
         { role: 'user', content: `Please analyze and summarize the following content:\n\n${processedContent}` }
       ],
       temperature: 0.7,
-      max_tokens: 2000,
+      max_tokens: 1500,
       response_format: { type: "json_object" }
     });
 
