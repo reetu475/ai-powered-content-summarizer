@@ -1,28 +1,114 @@
 import 'dotenv/config';
 import Groq from 'groq-sdk';
 import fs from 'fs';
+import path from 'path';
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
 
-export const transcribeAudio = async (filePath, originalFilename = '') => {
+export const transcribeAudio = async (filePath, originalFilename = '', language = 'en') => {
   try {
-    const ext = originalFilename.includes('.')
-      ? originalFilename.slice(originalFilename.lastIndexOf('.'))
-      : '.mp3';
+    let ext = path.extname(filePath).toLowerCase();
+    if (!ext && originalFilename.includes('.')) {
+      ext = originalFilename.slice(originalFilename.lastIndexOf('.')).toLowerCase();
+    }
+    if (!ext) {
+      ext = '.mp3';
+    }
     const uploadName = `audio${ext}`;
 
-    const transcription = await groq.audio.transcriptions.create({
+    const transcriptionParams = {
       file: fs.createReadStream(filePath, { filename: uploadName }),
-      model: 'whisper-large-v3-turbo'
-    });
+      model: 'whisper-large-v3-turbo',
+      temperature: 0.0
+    };
+
+    if (language && language !== 'auto') {
+      transcriptionParams.language = language;
+    }
+
+    const transcription = await groq.audio.transcriptions.create(transcriptionParams);
     return transcription.text;
   } catch (error) {
     console.error('Groq Audio Transcription Error:', error.message);
     console.error('Full transcription error:', error);
     throw new Error(`Failed to transcribe audio: ${error.message}`);
   }
+};
+
+export const isGibberishOrSilence = (text, contentType = '') => {
+  if (!text || typeof text !== 'string') return true;
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return true;
+
+  if (contentType === 'audio' || contentType === 'video') {
+    const lowerText = trimmed.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "").trim();
+    
+    // Common Whisper hallucinations on silent/static recordings
+    const commonHallucinations = [
+      'thank you',
+      'thank you for watching',
+      'thanks for watching',
+      'you',
+      'bye',
+      'subscribe',
+      'please subscribe',
+      'thank you very much',
+      'i do it do it do it im not a miracle',
+      'im not a miracle',
+      'gay gay gay',
+      'gay'
+    ];
+    
+    if (commonHallucinations.includes(lowerText)) {
+      return true;
+    }
+
+    const words = lowerText.split(/\s+/).filter(w => w.length > 0);
+    if (words.length > 0) {
+      const uniqueWords = new Set(words);
+      const ratio = uniqueWords.size / words.length;
+
+      // High repetition check (e.g. "gay gay gay gay")
+      if (words.length >= 4 && ratio < 0.35) {
+        return true;
+      }
+      
+      // Look for a word repeated consecutively 4 or more times
+      let consecutiveCount = 1;
+      for (let i = 1; i < words.length; i++) {
+        if (words[i] === words[i - 1]) {
+          consecutiveCount++;
+          if (consecutiveCount >= 4) {
+            return true;
+          }
+        } else {
+          consecutiveCount = 1;
+        }
+      }
+    }
+  }
+
+  return false;
+};
+
+export const createEmptyOrGibberishResponse = (contentType = '') => {
+  const isMedia = contentType === 'audio' || contentType === 'video';
+  const subject = isMedia ? 'media' : 'content';
+  const detailMsg = isMedia 
+    ? 'No clear, coherent, or meaningful spoken speech was detected in this media. It might contain silence, background noise, music, or unintelligible sounds.'
+    : 'The provided content is empty, too short, or does not contain meaningful text to analyze.';
+  
+  return {
+    short: `No meaningful ${subject} detected.`,
+    detailed: detailMsg,
+    bulletPoints: [],
+    keywords: [],
+    actionItems: [],
+    topicAnalysis: `No topics could be analyzed because the ${subject} lacks clear content.`,
+    strengthsWeaknesses: `No strengths or weaknesses can be evaluated because the ${subject} lacks clear content.`
+  };
 };
 
 export const generateSummary = async (content, summaryType = 'detailed') => {
@@ -81,8 +167,13 @@ export const generateSummary = async (content, summaryType = 'detailed') => {
   }
 };
 
-export const generateAllSummaries = async (content) => {
+export const generateAllSummaries = async (content, contentType = '') => {
   try {
+    if (isGibberishOrSilence(content, contentType)) {
+      console.log('Content classified as silence or gibberish. Returning pre-defined fallback summaries.');
+      return createEmptyOrGibberishResponse(contentType);
+    }
+
     console.log('Generating all summaries in a single JSON API request...');
     
     // Handle very large documents by truncating to stay safely within the 6,000 TPM limit
@@ -94,7 +185,19 @@ export const generateAllSummaries = async (content) => {
     }
 
     const systemPrompt = `You are a professional content summarizer. You must analyze the provided content and return a JSON object containing different types of summaries.
-The response must be a valid JSON object with the following exact keys and structure:
+
+If the content is repetitive gibberish, silence, background noise, or does not contain coherent meaningful language (for example, repeating the same words over and over, or just short hallucinated greetings/phrases with no actual context to summarize), you must set the summaries to indicate that no clear spoken content or meaningful speech was detected in the media. In this case, use these exact values:
+{
+  "short": "No clear spoken content or meaningful speech was detected.",
+  "detailed": "The analysis indicates that the provided content does not contain clear, coherent, or meaningful spoken language. It may consist of silence, background noise, music, or unintelligible sounds.",
+  "bulletPoints": [],
+  "keywords": [],
+  "actionItems": [],
+  "topicAnalysis": "No meaningful topics could be analyzed due to the lack of coherent content.",
+  "strengthsWeaknesses": "No strengths or weaknesses can be analyzed due to the lack of coherent content."
+}
+
+Otherwise, generate a comprehensive set of summaries and return a valid JSON object with the following exact keys and structure:
 {
   "short": "A concise 1-2 sentence summary of the main point.",
   "detailed": "A comprehensive and well-structured detailed summary of the content.",

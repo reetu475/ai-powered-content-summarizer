@@ -112,3 +112,62 @@
   color: var(--primary-color);
   font-weight: bold;
 }
+
+.transcript-section {
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-primary);
+}
+
+.transcript-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.accordion-icon {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  transition: transform var(--transition-base);
+  transform: rotate(0deg);
+  display: inline-block;
+}
+
+.accordion-icon.open {
+  transform: rotate(90deg);
+}
+
+.transcript-content-wrapper {
+  border-top: 1px solid var(--border-color);
+  padding-top: 1rem;
+  margin-top: 1rem;
+}
+
+.transcript-text {
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+/* Custom Scrollbar for Transcript Text */
+.transcript-text::-webkit-scrollbar {
+  width: 6px;
+}
+
+.transcript-text::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius-sm);
+}
+
+.transcript-text::-webkit-scrollbar-thumb {
+  background: var(--border-hover);
+  border-radius: var(--border-radius-sm);
+}
+
+.transcript-text::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}

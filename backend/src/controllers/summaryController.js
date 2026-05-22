@@ -48,7 +48,7 @@ export const generateSummary = async (req, res) => {
     console.log('Generating summaries for content length:', content?.length);
 
     // Generate all summary types
-    const summariesData = await generateAllSummaries(content);
+    const summariesData = await generateAllSummaries(content, contentType);
 
     console.log('Summaries generated successfully');
 

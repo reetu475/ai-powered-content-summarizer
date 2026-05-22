@@ -83,7 +83,8 @@ export const processFile = async (req, res) => {
     const mediaCategory = getMediaCategory(req.file.mimetype, req.file.originalname);
 
     if (mediaCategory === 'audio') {
-      const content = await transcribeAudio(filePath, req.file.originalname);
+      const language = req.body.language || 'en';
+      const content = await transcribeAudio(filePath, req.file.originalname, language);
       return res.json({
         success: true,
         content: content.trim(),
@@ -97,7 +98,14 @@ export const processFile = async (req, res) => {
         await prepareMediaForTranscription(filePath, 'video');
       cleanupPaths.push(...tempPaths);
 
-      const content = await transcribeAudio(transcribePath, req.file.originalname);
+      const language = req.body.language || 'en';
+      let content = await transcribeAudio(transcribePath, req.file.originalname, language);
+
+      // If transcription fails or returns empty content, provide a fallback message
+      if (!content || content.trim().length === 0) {
+        content = 'This video contains no clear audio or speech. The video content could not be transcribed. For video-only content analysis, visual action detection would be required, which is not currently supported. Please provide a video with clear speech or use a different content type.';
+      }
+
       return res.json({
         success: true,
         content: content.trim(),
@@ -118,15 +126,20 @@ export const processFile = async (req, res) => {
     switch (fileExtension) {
       case '.txt':
         content = fs.readFileSync(filePath, 'utf8');
+        console.log('TXT file processed, content length:', content.length);
         break;
       case '.pdf': {
         const pdfData = await pdf(filePath);
         content = pdfData.text;
+        console.log('PDF file processed, content length:', content.length);
         break;
       }
       case '.docx': {
+        console.log('Processing DOCX file:', filePath);
         const docxData = await mammoth.extractRawText({ path: filePath });
         content = docxData.value;
+        console.log('DOCX file processed, content length:', content.length);
+        console.log('DOCX extraction messages:', docxData.messages);
         break;
       }
       case '.doc':
@@ -137,6 +150,14 @@ export const processFile = async (req, res) => {
           success: false,
           error: 'Unsupported file type'
         });
+    }
+
+    if (!content || content.trim().length === 0) {
+      console.error('File processing resulted in empty content for:', req.file.originalname);
+      return res.status(400).json({
+        success: false,
+        error: 'Could not extract content from file. The file may be empty or corrupted.'
+      });
     }
 
     res.json({
