@@ -4,6 +4,9 @@ import fs from 'fs';
 import path from 'path';
 import { wrapSDK } from 'langsmith/wrappers';
 import { traceable } from 'langsmith/traceable';
+import { Client } from 'langsmith';
+
+const langsmithClient = new Client({});
 
 const groq = wrapSDK(new Groq({
   apiKey: process.env.GROQ_API_KEY
@@ -36,8 +39,14 @@ export const transcribeAudio = traceable(async (filePath, originalFilename = '',
     console.error('Groq Audio Transcription Error:', error.message);
     console.error('Full transcription error:', error);
     throw new Error(`Failed to transcribe audio: ${error.message}`);
+  } finally {
+    try {
+      await langsmithClient.awaitPendingTraceBatches();
+    } catch (err) {
+      console.error('Failed to flush LangSmith traces:', err);
+    }
   }
-}, { name: 'transcribeAudio' });
+}, { name: 'transcribeAudio', client: langsmithClient });
 
 export const isGibberishOrSilence = (text, contentType = '') => {
   if (!text || typeof text !== 'string') return true;
@@ -166,8 +175,14 @@ export const generateSummary = traceable(async (content, summaryType = 'detailed
       throw new Error('Groq API server error. Please try again later.');
     }
     throw new Error(`Failed to generate summary using AI: ${error.message}`);
+  } finally {
+    try {
+      await langsmithClient.awaitPendingTraceBatches();
+    } catch (err) {
+      console.error('Failed to flush LangSmith traces:', err);
+    }
   }
-}, { name: 'generateSummary' });
+}, { name: 'generateSummary', client: langsmithClient });
 
 export const generateAllSummaries = traceable(async (content, contentType = '') => {
   try {
@@ -247,8 +262,14 @@ Do not include any markdown formatting, backticks, or text before/after the JSON
   } catch (error) {
     console.error('Error in single-request summary generation:', error);
     throw new Error(`Failed to generate summaries: ${error.message}`);
+  } finally {
+    try {
+      await langsmithClient.awaitPendingTraceBatches();
+    } catch (err) {
+      console.error('Failed to flush LangSmith traces:', err);
+    }
   }
-}, { name: 'generateAllSummaries' });
+}, { name: 'generateAllSummaries', client: langsmithClient });
 
 export const generateEmbedding = async (text) => {
   try {
