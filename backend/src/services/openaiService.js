@@ -2,12 +2,14 @@ import 'dotenv/config';
 import Groq from 'groq-sdk';
 import fs from 'fs';
 import path from 'path';
+import { wrapSDK } from 'langsmith/wrappers';
+import { traceable } from 'langsmith/traceable';
 
-const groq = new Groq({
+const groq = wrapSDK(new Groq({
   apiKey: process.env.GROQ_API_KEY
-});
+}));
 
-export const transcribeAudio = async (filePath, originalFilename = '', language = 'en') => {
+export const transcribeAudio = traceable(async (filePath, originalFilename = '', language = 'en') => {
   try {
     let ext = path.extname(filePath).toLowerCase();
     if (!ext && originalFilename.includes('.')) {
@@ -35,7 +37,7 @@ export const transcribeAudio = async (filePath, originalFilename = '', language 
     console.error('Full transcription error:', error);
     throw new Error(`Failed to transcribe audio: ${error.message}`);
   }
-};
+}, { name: 'transcribeAudio' });
 
 export const isGibberishOrSilence = (text, contentType = '') => {
   if (!text || typeof text !== 'string') return true;
@@ -111,7 +113,7 @@ export const createEmptyOrGibberishResponse = (contentType = '') => {
   };
 };
 
-export const generateSummary = async (content, summaryType = 'detailed') => {
+export const generateSummary = traceable(async (content, summaryType = 'detailed') => {
   try {
     let prompt = '';
     let systemPrompt = 'You are a professional content summarizer. Provide accurate, concise, and well-structured summaries.';
@@ -165,9 +167,9 @@ export const generateSummary = async (content, summaryType = 'detailed') => {
     }
     throw new Error(`Failed to generate summary using AI: ${error.message}`);
   }
-};
+}, { name: 'generateSummary' });
 
-export const generateAllSummaries = async (content, contentType = '') => {
+export const generateAllSummaries = traceable(async (content, contentType = '') => {
   try {
     if (isGibberishOrSilence(content, contentType)) {
       console.log('Content classified as silence or gibberish. Returning pre-defined fallback summaries.');
@@ -246,7 +248,7 @@ Do not include any markdown formatting, backticks, or text before/after the JSON
     console.error('Error in single-request summary generation:', error);
     throw new Error(`Failed to generate summaries: ${error.message}`);
   }
-};
+}, { name: 'generateAllSummaries' });
 
 export const generateEmbedding = async (text) => {
   try {
